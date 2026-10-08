@@ -1,6 +1,6 @@
 // ============================================================
 // calculate.js — scientific data, curve models, citations
-// Sources: ESM literature + Phan et al. 2024 (thesis)
+// Sources: ESM literature + Phan 2024 (undergraduate thesis, https://doi.org/10.5281/zenodo.23227695)
 // ============================================================
 
 // ─── CITATIONS ──────────────────────────────────────────────
@@ -11,7 +11,7 @@ export const CITATIONS = {
   4: "Agathokleous E, Calabrese EJ (2020) A global environmental health perspective and optimisation of stress. Sci Total Environ 704:135263.",
   5: "Bello-Bello JJ, Spinoso-Castillo JL, Mancilla-Álvarez E (2024) Hormesis in plant tissue culture. Plant Cell Tiss Organ Cult 159:16.",
   6: "Pasternak T, Steinmacher D (2024) Plant Growth Regulation in Cell and Tissue Culture In Vitro. Plants 13:327.",
-  7: "Phan MTQ, Nguyen TM, Vo PT, Lam TK, Pham TTM (2024) [Manuscript under review — illustrative case: Citrus hystrix DC.]",
+  7: "Phan TQM (2024) Khảo sát ảnh hưởng của phytohormone đến hiệu quả vi nhân giống cây chanh chúc (Citrus hystrix) [Effects of phytohormones on the micropropagation efficiency of kaffir lime]. Undergraduate thesis, Ho Chi Minh City University of Technology, VNU-HCM. Illustrative case for Phan et al. (manuscript under review). https://doi.org/10.5281/zenodo.23227695",
   8: "Hedden P, Thomas SG (2012) Gibberellin biosynthesis and its regulation. Biochem J 444:11–25.",
   9: "Kieber JJ, Schaller GE (2018) Cytokinin signaling in plant development. Development 145:dev149344.",
   10: "Müller D, Leyser O (2011) Auxin, cytokinin and the control of shoot branching. Ann Bot 107:1203–1212.",
@@ -68,64 +68,99 @@ export const SPECIES_STYLE = {
   },
 };
 
-// ─── CURVE MODELS ────────────────────────────────────────────
+// ─── C. HYSTRIX MEASURED MEANS ───────────────────────────────
+// Phan 2024 thesis, Tables 3.2–3.4 (doi:10.5281/zenodo.23227695).
+// BA: nodal stem segments with one axillary bud; 6-week shoot-induction rate.
+// 2,4-D: leaf explants; ALL 2,4-D media also contained 1 mg/L BA; the control had no PGR.
+// NAA: shoot-tip explants, 6 weeks.
+export const HYSTRIX_DATA = {
+  BA: {
+    conc: [0, 1, 2, 3, 4],
+    inductionRate: [0.4, 1, 1, 1, 1],
+    shootNumber: [1.25, 6.53, 8.2, 10.7, 12.2],
+    shootHeight: [0.44, 1.81, 1.18, 0.6, 0.59],
+  },
+  D24: {
+    conc: [0, 1, 2, 3, 4],
+    callusRate: [6.67, 100, 100, 100, 100],
+    freshWeight: [0.005, 0.954, 0.754, 0.585, 0.512],
+  },
+  NAA: {
+    conc: [0, 0.5, 1, 1.5, 2],
+    rootingRate: [26.67, 90.0, 93.33, 66.67, 53.33],
+    rootNumber: [1.0, 1.69, 1.852, 1.0, 1.063],
+    rootLength: [0.79, 2.515, 1.419, 1.08, 1.66],
+  },
+};
 
-// BA — shoot number (linear rise)
+// Piecewise-linear interpolation through the measured means.
+// Returns null outside the tested range, so no curve is extrapolated.
+function interp(xs, ys, c) {
+  if (c < xs[0] || c > xs[xs.length - 1]) return null;
+  for (let i = 1; i < xs.length; i++) {
+    if (c <= xs[i]) {
+      const t = (c - xs[i - 1]) / (xs[i] - xs[i - 1]);
+      return ys[i - 1] + t * (ys[i] - ys[i - 1]);
+    }
+  }
+  return ys[ys.length - 1];
+}
+
+const HB = HYSTRIX_DATA.BA;
+const HD = HYSTRIX_DATA.D24;
+const HN = HYSTRIX_DATA.NAA;
+// WMI = induction rate × shoot number × shoot height
+export const WMI_POINTS = HB.conc.map(
+  (_, i) => HB.inductionRate[i] * HB.shootNumber[i] * HB.shootHeight[i]
+);
+// RQI = rooting rate × root number × root length
+export const RQI_POINTS = HN.conc.map(
+  (_, i) => (HN.rootingRate[i] / 100) * HN.rootNumber[i] * HN.rootLength[i]
+);
+
+// ─── CURVES: measured metrics (interpolated) ─────────────────
 export function baShootNumber(c) {
-  return Math.max(0, 1.8 + 1.8 * c);
+  return interp(HB.conc, HB.shootNumber, c);
 }
-// BA — shoot height (linear decline, GA2ox mechanism)
 export function baShootHeight(c) {
-  if (c <= 0) return 2.0;
-  return Math.max(0.3, 2.1 - 0.38 * c);
+  return interp(HB.conc, HB.shootHeight, c);
 }
-// BA — WMI composite index
 export function baWMI(c) {
-  const ir = c > 0 ? Math.min(1, 0.6 + 0.15 * c) : 0;
-  return ir * baShootNumber(c) * baShootHeight(c);
+  return interp(HB.conc, WMI_POINTS, c);
 }
-// BA — bioactive GA proxy (suppressed by GA2ox above 1 mg/L)
+export function dFreshWeight(c) {
+  return interp(HD.conc, HD.freshWeight, c);
+}
+export function naaRootRate(c) {
+  return interp(HN.conc, HN.rootingRate, c);
+}
+export function naaRootLength(c) {
+  return interp(HN.conc, HN.rootLength, c);
+}
+export function naaRQI(c) {
+  return interp(HN.conc, RQI_POINTS, c);
+}
+
+// ─── CURVES: conceptual mechanism proxies (not measured) ─────
+// Shapes illustrate the proposed mechanisms only; no C. hystrix measurements exist.
+// BA — bioactive GA proxy (suppressed via GA2ox above ~1 mg/L)
 export function baGALevel(c) {
   return Math.max(0.05, 1.0 - 0.28 * c);
-}
-
-// 2,4-D — callus fresh weight
-export function dFreshWeight(c) {
-  if (c <= 0) return 0;
-  if (c <= 1.0) return 0.954 * c;
-  return 0.954 * Math.exp(-0.55 * (c - 1.0));
 }
 // 2,4-D — ROS level proxy
 export function dROS(c) {
   if (c <= 1.0) return 0.08 + 0.04 * c;
   return 0.12 + 0.3 * Math.pow(c - 1.0, 1.4);
 }
-// 2,4-D — browning index (0–1)
+// 2,4-D — browning index proxy (0–1); browning was scored visually, not measured
 export function dBrowning(c) {
   if (c <= 1.5) return 0;
   return Math.min(1, 0.35 * (c - 1.5));
-}
-
-// NAA — rooting rate (bell-shaped)
-export function naaRootRate(c) {
-  if (c <= 0) return 26.67;
-  return 26.67 + (93 - 26.67) * Math.exp(-Math.pow(c - 0.75, 2) / 0.605);
-}
-// NAA — root length (bell, peak 0.5 mg/L)
-export function naaRootLength(c) {
-  if (c <= 0) return 0.8;
-  return 0.8 + (2.515 - 0.8) * Math.exp(-Math.pow(c - 0.5, 2) / 0.405);
 }
 // NAA — ethylene proxy (ACC synthase above ~0.8 mg/L)
 export function naaEthylene(c) {
   if (c <= 0.8) return 0.05 + 0.03 * c;
   return 0.069 + 0.22 * Math.pow(c - 0.8, 1.3);
-}
-// NAA — RQI composite
-export function naaRQI(c) {
-  const rn =
-    c <= 0 ? 0.8 : Math.max(0.5, 3.2 * Math.exp(-Math.pow(c - 0.6, 2) / 0.5));
-  return (naaRootRate(c) / 100) * rn * naaRootLength(c);
 }
 
 // ─── SCATTER DATA — THESIS ───────────────────────────────────
@@ -133,36 +168,43 @@ export function naaRQI(c) {
 // primary = main morphogenetic metric (normalised to same axis as curve)
 
 export const SCATTER_BA = {
-  // ── Phan et al. 2024 — C. hystrix (leaf axillary bud explants, MS+BA 1–4 mg/L) [7]
-  // shoot_number, shoot_height (cm), WMI. r=+0.969 for shoot_number vs BA conc.
+  // ── Phan 2024 thesis — C. hystrix, nodal segments with axillary bud, MS + BA 0–4 mg/L [7]
+  // primary = shoots/explant, secondary = shoot height (cm), quality = WMI. r = +0.969 (0–4 mg/L).
   "C. hystrix (Phan 2024)": [
     {
+      conc: 0,
+      primary: 1.25,
+      secondary: 0.44,
+      quality: 0.22,
+      label: "0 mg/L (control) — 1.25 shoots / 0.44 cm",
+    },
+    {
       conc: 1,
-      primary: 3.2,
+      primary: 6.53,
       secondary: 1.81,
-      quality: 5.79,
-      label: "3.2 shoots / 1.81 cm",
+      quality: 11.82,
+      label: "1 mg/L — 6.53 shoots / 1.81 cm (WMI peak)",
     },
     {
       conc: 2,
-      primary: 5.4,
-      secondary: 1.32,
-      quality: 7.13,
-      label: "5.4 shoots / 1.32 cm",
+      primary: 8.2,
+      secondary: 1.18,
+      quality: 9.68,
+      label: "2 mg/L — 8.20 shoots / 1.18 cm",
     },
     {
       conc: 3,
-      primary: 7.1,
-      secondary: 0.94,
-      quality: 6.67,
-      label: "7.1 shoots / 0.94 cm",
+      primary: 10.7,
+      secondary: 0.6,
+      quality: 6.42,
+      label: "3 mg/L — 10.70 shoots / 0.60 cm",
     },
     {
       conc: 4,
-      primary: 9.0,
+      primary: 12.2,
       secondary: 0.59,
-      quality: 5.31,
-      label: "9.0 shoots / 0.59 cm",
+      quality: 7.2,
+      label: "4 mg/L — 12.20 shoots / 0.59 cm, leaf abscission",
     },
   ],
   // ── Yulian et al. 2021 — C. hystrix (lateral shoots, MS+BAP or Kinetin 0–5 ppm, 8 wk) [27]
@@ -320,43 +362,43 @@ export const SCATTER_BA = {
 };
 
 export const SCATTER_NAA = {
-  // ── Phan et al. 2024 — C. hystrix, shoot explants, MS+NAA 0–2 mg/L [7]
-  // rooting_rate (%), root_length (cm), RQI
+  // ── Phan 2024 thesis — C. hystrix, shoot-tip explants, MS + NAA 0–2 mg/L [7]
+  // primary = rooting rate (%), secondary = root length (cm), quality = RQI
   "C. hystrix (Phan 2024)": [
     {
       conc: 0,
       primary: 26.67,
-      secondary: 0.8,
-      quality: null,
-      label: "0 mg/L — 26.7% / 0.80 cm",
+      secondary: 0.79,
+      quality: 0.211,
+      label: "0 mg/L (control) — 26.7% / 0.79 cm",
     },
     {
       conc: 0.5,
       primary: 90.0,
       secondary: 2.515,
-      quality: null,
-      label: "0.5 mg/L — 90% / 2.52 cm (RQI peak)",
+      quality: 3.825,
+      label: "0.5 mg/L — 90.0% / 2.52 cm (RQI peak)",
     },
     {
       conc: 1.0,
       primary: 93.33,
-      secondary: 1.95,
-      quality: null,
-      label: "1.0 mg/L — 93% / 1.95 cm",
+      secondary: 1.419,
+      quality: 2.453,
+      label: "1.0 mg/L — 93.3% / 1.42 cm",
     },
     {
       conc: 1.5,
       primary: 66.67,
-      secondary: 1.42,
-      quality: null,
-      label: "1.5 mg/L — 67% / 1.42 cm",
+      secondary: 1.08,
+      quality: 0.72,
+      label: "1.5 mg/L — 66.7% / 1.08 cm",
     },
     {
       conc: 2.0,
       primary: 53.33,
-      secondary: 1.05,
-      quality: null,
-      label: "2.0 mg/L — 53% / 1.05 cm",
+      secondary: 1.66,
+      quality: 0.941,
+      label: "2.0 mg/L — 53.3% / 1.66 cm",
     },
   ],
   // ── Al-Bahrany 2002 — C. aurantifolia rooting (MS+NAA or IBA) [24]
@@ -446,36 +488,44 @@ export const SCATTER_NAA = {
 };
 
 export const SCATTER_D24 = {
-  // ── Phan et al. 2024 — C. hystrix, leaf explants, MS+2,4-D 1–4 mg/L [7]
-  // 100% callus induction across all. fresh_weight (g/explant), browning_index
+  // ── Phan 2024 thesis — C. hystrix, leaf explants, MS + 1 mg/L BA + 2,4-D 1–4 mg/L [7]
+  // Control: hormone-free MS. primary = callus fresh weight (g/explant).
+  // Browning was described visually only, so secondary is left empty.
   "C. hystrix (Phan 2024)": [
+    {
+      conc: 0,
+      primary: 0.005,
+      secondary: null,
+      quality: null,
+      label: "0 mg/L (control, no PGR) — 6.67% callus, 0.005 g",
+    },
     {
       conc: 1,
       primary: 0.954,
-      secondary: 0,
+      secondary: null,
       quality: null,
-      label: "1 mg/L — 0.954 g, no browning",
+      label: "1 mg/L — 0.954 g, friable, pale yellow-green",
     },
     {
       conc: 2,
-      primary: 0.741,
-      secondary: 0.1,
+      primary: 0.754,
+      secondary: null,
       quality: null,
-      label: "2 mg/L — 0.741 g, slight yellowing",
+      label: "2 mg/L — 0.754 g",
     },
     {
       conc: 3,
-      primary: 0.601,
-      secondary: 0.5,
+      primary: 0.585,
+      secondary: null,
       quality: null,
-      label: "3 mg/L — 0.601 g, browning onset",
+      label: "3 mg/L — 0.585 g, dry, brown",
     },
     {
       conc: 4,
       primary: 0.512,
-      secondary: 0.9,
+      secondary: null,
       quality: null,
-      label: "4 mg/L — 0.512 g, visibly brown",
+      label: "4 mg/L — 0.512 g, dry, brown",
     },
   ],
   // ── Tunjung et al. 2020 — C. hystrix (seed embryo explants) [28]
@@ -653,7 +703,7 @@ export const CROSS_SPECIES = {
       optConc: 1.0,
       metric: "WMI peak",
       value: "1 mg/L BA",
-      source: "Phan et al. 2024 [7]",
+      source: "Phan 2024 [7]",
     },
     {
       species: "C. hystrix",
@@ -690,7 +740,7 @@ export const CROSS_SPECIES = {
       optConc: 0.5,
       metric: "RQI peak",
       value: "0.5 mg/L NAA",
-      source: "Phan et al. 2024 [7]",
+      source: "Phan 2024 [7]",
     },
     {
       species: "C. aurantifolia",
@@ -720,7 +770,7 @@ export const CROSS_SPECIES = {
       optConc: 1.0,
       metric: "Fresh weight peak",
       value: "0.954 g/explant",
-      source: "Phan et al. 2024 [7]",
+      source: "Phan 2024 [7]",
     },
     {
       species: "C. hystrix (seed)",
@@ -802,7 +852,7 @@ export const HORMONES = {
     stage: "Callus Induction",
     geometry: "Narrow productive window",
     primaryMetric: "Fresh Weight (g/explant)",
-    secondaryMetric: "Browning Index (0–1)",
+    secondaryMetric: "Browning index (conceptual, 0–1)",
     qualityIndex: "Fresh Weight",
   },
   NAA: {

@@ -24,7 +24,17 @@ The interface is organised into five tabs:
 
 A full reference list (36 citations) is shown at the bottom of every tab.
 
-> **Note:** The continuous curves are simplified illustrative models fitted to published data. They are intended to support the review's argument, not to serve as predictive models for protocol design.
+## Data
+
+The *Citrus hystrix* values (filled circles and solid curves) come from the source undergraduate thesis, openly available on Zenodo:
+
+> Phan TQM (2024) *Khảo sát ảnh hưởng của phytohormone đến hiệu quả vi nhân giống cây chanh chúc (Citrus hystrix)* [Effects of phytohormones on the micropropagation efficiency of kaffir lime]. Undergraduate thesis, Ho Chi Minh City University of Technology, VNU-HCM. https://doi.org/10.5281/zenodo.23227695
+
+- Solid curves interpolate the thesis means (Tables 3.2–3.4) within the tested range only; nothing is extrapolated beyond 4 mg/L BA, 4 mg/L 2,4-D or 2 mg/L NAA.
+- WMI = induction rate × shoot number × shoot height; RQI = rooting rate × root number × root length.
+- In the callus experiment every 2,4-D medium also contained 1 mg/L BA; the control contained no growth regulator.
+- Mechanism proxies (GA level, ROS, browning index, ethylene) are conceptual curves that illustrate the proposed mechanisms; they are not measurements.
+- Literature points for other species are taken from the cited papers and normalised to the *C. hystrix* curve maximum for visual comparison only.
 
 ## Run locally
 
@@ -83,7 +93,7 @@ phytohormone-framework/
 └── README.md
 ```
 
-To update the scientific content (data points, citations, mechanism text), edit `src/calculate.js`. The views read everything from there.
+To update the scientific content, edit `src/calculate.js`: `HYSTRIX_DATA` holds the *C. hystrix* means, `SCATTER_*` the literature points, and `CITATIONS`, `MECHANISMS` and `KNOWLEDGE_GAPS` the text. The views read everything from there.
 
 ## Built with
 

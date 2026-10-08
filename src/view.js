@@ -504,19 +504,22 @@ export function InteractiveDoseResponse({
     [hormone, sliderVal]
   );
 
-  const maxP = Math.max(...curveData.map((d) => d.primary));
-  const maxS = Math.max(...curveData.map((d) => d.secondary));
+  // Curves are null outside the tested C. hystrix range (no extrapolation)
+  const maxOf = (k) =>
+    Math.max(...curveData.map((d) => d[k]).filter((v) => v != null));
+  const norm = (v, m) => (v == null || !(m > 0) ? null : (v / m) * 100);
+  const maxP = maxOf("primary");
+  const maxS = maxOf("secondary");
 
   // Normalised curve for % display
   const chartData = useMemo(
     () =>
       curveData.map((d) => ({
         conc: d.conc,
-        pN: (d.primary / maxP) * 100,
-        sN: (d.secondary / maxS) * 100,
-        qN: (d.quality / Math.max(...curveData.map((x) => x.quality))) * 100,
-        mN:
-          (d.mechanism / Math.max(...curveData.map((x) => x.mechanism))) * 100,
+        pN: norm(d.primary, maxP),
+        sN: norm(d.secondary, maxS),
+        qN: norm(d.quality, maxOf("quality")),
+        mN: norm(d.mechanism, maxOf("mechanism")),
       })),
     [curveData, maxP, maxS]
   );
@@ -536,20 +539,20 @@ export function InteractiveDoseResponse({
 
   const lineCfg = {
     BA: {
-      p: { color: T.green, name: "Shoot Number (model)" },
-      s: { color: T.amberLt, name: "Shoot Height cm (model)" },
+      p: { color: T.green, name: "Shoot number (C. hystrix, interpolated model)" },
+      s: { color: T.amberLt, name: "Shoot height (C. hystrix, interpolated model)" },
       q: { color: T.accent, name: "WMI quality index" },
       m: { color: T.red, name: "GA suppression proxy" },
     },
     D24: {
-      p: { color: T.orange, name: "Callus Fresh Wt g (model)" },
-      s: { color: T.red, name: "Browning Index (model)" },
+      p: { color: T.orange, name: "Callus fresh weight (C. hystrix, interpolated model)" },
+      s: { color: T.red, name: "Browning index (conceptual model)" },
       q: { color: T.orange, name: "Fresh Weight" },
       m: { color: T.red, name: "ROS level proxy" },
     },
     NAA: {
-      p: { color: T.blue, name: "Rooting Rate % (model)" },
-      s: { color: T.green, name: "Root Length cm (model)" },
+      p: { color: T.blue, name: "Rooting rate (C. hystrix, interpolated model)" },
+      s: { color: T.green, name: "Root length (C. hystrix, interpolated model)" },
       q: { color: T.accent, name: "RQI quality index" },
       m: { color: T.red, name: "Ethylene proxy" },
     },
@@ -724,8 +727,11 @@ export function InteractiveDoseResponse({
             fontStyle: "italic",
           }}
         >
-          Filled circle = Phan et al. 2024 (thesis). Open symbols = literature.
-          All values normalised to % of model maximum for comparison.
+          Filled circle = C. hystrix illustrative case (Phan 2024, thesis{" "}
+          <a href="https://doi.org/10.5281/zenodo.23227695" target="_blank" rel="noreferrer" style={{ color: T.accent }}>doi:10.5281/zenodo.23227695</a>).
+          Open symbols = literature. Solid curves interpolate the C. hystrix means
+          within the tested range; proxy curves are conceptual. All values
+          normalised to % of the curve maximum.
         </div>
       </div>
 
@@ -1200,7 +1206,7 @@ export function MechanismExplorer() {
       sub: "Cytokinin overdrive → graded quantity–quality trade-off",
       kinetics:
         "Graded enzymatic process running in parallel with cytokinin receptor activation. Unlike ROS cascades, GA inactivation is reversible and proportional — producing a continuous linear inverse relationship, not a bistable threshold.",
-      note: "WMI peaked at 1 mg/L BA despite shoot count rising to 4 mg/L (4.9-fold quality gap). Premature leaf abscission observed at 4 mg/L — consistent with cytokinin-induced disruption of source–sink relationships.",
+      note: "WMI peaked at 1 mg/L BA (11.8) and was 1.6-fold lower at 4 mg/L (7.2) despite shoot count rising to 12.2. Premature leaf abscission observed at 4 mg/L — consistent with cytokinin-induced disruption of source–sink relationships.",
       steps: [
         {
           t: "BA activates two-component phosphorelay (AHK → AHP → ARR) → lateral bud release → shoot number rises linearly.",
@@ -1233,7 +1239,7 @@ export function MechanismExplorer() {
       sub: "2,4-D oversaturation → self-amplifying polyphenol oxidation",
       kinetics:
         "Threshold-dependent and self-amplifying. Once PAL is activated, polyphenol → quinone cascades accelerate, creating a positive-feedback browning loop. This bistability explains the sharp (not graded) transition from productive callus to arrested tissue.",
-      note: "100% callus induction achieved across 1–4 mg/L, confirming absolute auxin requirement. Fresh weight 0.954 g at 1 mg/L → 0.512 g at 4 mg/L. Compact, dry, visibly brown morphology at 3–4 mg/L.",
+      note: "All 2,4-D media also contained 1 mg/L BA. Callus induction was 100% at 1–4 mg/L vs 6.67% on hormone-free medium, so an auxin–cytokinin interaction cannot be excluded. Fresh weight 0.954 g at 1 mg/L → 0.512 g at 4 mg/L. Compact, dry, visibly brown morphology at 3–4 mg/L.",
       steps: [
         {
           t: "2,4-D activates auxin-responsive TFs → chromatin remodelling → cell cycle re-entry → callus proliferation.",
@@ -1868,6 +1874,19 @@ export function KnowledgeGapsView() {
 // ============================================================
 // FOOTNOTES
 // ============================================================
+// Render https:// URLs inside a citation string as links
+function linkify(text) {
+  return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noreferrer" style={{ color: T.accent }}>
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
+
 export function Footnotes({ usedCitations }) {
   const sorted = [...new Set(usedCitations)].sort((a, b) => a - b);
   return (
@@ -1901,7 +1920,7 @@ export function Footnotes({ usedCitations }) {
                 }}
               >
                 <span style={{ color: T.amber, fontWeight: 700 }}>[{n}]</span>{" "}
-                {CITATIONS[n]}
+                {linkify(CITATIONS[n])}
               </div>
             )
         )}
@@ -1917,7 +1936,7 @@ export function Footnotes({ usedCitations }) {
           fontFamily: "'Inter','Segoe UI',sans-serif",
         }}
       >
-        [7] Phan et al. 2024 serves as an illustrative case grounding the
+        [7] Phan 2024 (undergraduate thesis, openly available on Zenodo) serves as an illustrative case grounding the
         framework in observable tissue culture outcomes — not as primary
         mechanistic evidence. All mechanistic claims are supported by the
         broader literature cited above.
