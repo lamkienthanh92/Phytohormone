@@ -55,6 +55,15 @@ The repository includes a workflow (`.github/workflows/deploy.yml`) that builds 
 
 The site will be available at `https://<your-username>.github.io/phytohormone-framework/`.
 
+## Deploy to Netlify
+
+The repository includes a `netlify.toml`, so Netlify picks up the correct settings automatically when you import the repo:
+
+- Build command: `npm run build`
+- Publish directory: `build`
+
+Do not drag the source folder into Netlify Drop: it contains no built site, so Netlify serves a 404. Either connect the GitHub repo, or run `npm run build` locally and drop the resulting `build/` folder.
+
 ## Project structure
 
 ```
@@ -69,6 +78,7 @@ phytohormone-framework/
 │   ├── calculate.js    # Citations, curve models, scatter data, mechanisms, knowledge gaps
 │   ├── theme.js        # Colour palette
 │   └── styles.css
+├── netlify.toml                 # Netlify build settings
 ├── package.json
 └── README.md
 ```
